@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <title>Budget PWA</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
+  <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Inter, sans-serif;
+      background: #020617;
+      color: white;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    * {
+      box-sizing: border-box;
+      scrollbar-width: none;
+    }
+
+    *::-webkit-scrollbar {
+      display: none;
+    }
+
+    .glass {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    .animate-fade {
+      animation: fade .3s ease;
+    }
+
+    @keyframes fade {
+      from {opacity:0; transform:translateY(8px)}
+      to {opacity:1; transform:translateY(0)}
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const {
+      PieChart,
+      Pie,
+      Cell,
+      Tooltip,
+      ResponsiveContainer,
+      BarChart,
+      Bar,
+      XAxis,
+      YAxis,
+      CartesianGrid,
+      LineChart,
+      Line,
+      Legend
+    } = Recharts;
+
+    const STORAGE_KEY = 'budget-pwa';
+
+    const currency = new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      maximumFractionDigits: 0,
+    });
+
+    const categories = {
+      income: ['Gaji','Freelance','Bonus','Investasi','Lainnya'],
+      expense: ['Makanan','Transportasi','Belanja','Tagihan','Kesehatan','Hiburan','Pendidikan','Lainnya']
+    };
+
+    function App() {
+      const [transactions, setTransactions] = React.useState(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        return saved ? JSON.parse(saved) : [];
+      });
+
+      const [type, setType] = React.useState('expense');
+      const [category, setCategory] = React.useState('Makanan');
+      const [amount, setAmount] = React.useState('');
+      const [note, setNote] = React.useState('');
+      const [date, setDate] = React.useState(new Date().toISOString().slice(0,10));
+      const [budget, setBudget] = React.useState(Number(localStorage.getItem('budgetLimit')) || 10000000);
+      const [wallets, setWallets] = React.useState(JSON.parse(localStorage.getItem('wallets')) || ['Dompet Utama']);
+      const [wallet, setWallet] = React.useState('Dompet Utama');
+      const [savingTarget, setSavingTarget] = React.useState(Number(localStorage.getItem('savingTarget')) || 5000000);
+      const [billReminder, setBillReminder] = React.useState('');
+      const [search, setSearch] = React.useState('');
+      const [theme, setTheme] = React.useState(localStorage.getItem('theme') || 'dark');
+      const [installPrompt, setInstallPrompt] = React.useState(null);
+
+      React.useEffect(() => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+      }, [transactions]);
+
+      React.useEffect(() => {
+        localStorage.setItem('budgetLimit', budget);
+      }, [budget]);
+
+      React.useEffect(() => {
+        localStorage.setItem('wallets', JSON.stringify(wallets));
+      }, [wallets]);
+
+      React.useEffect(() => {
+        localStorage.setItem('savingTarget', savingTarget);
+      }, [savingTarget]);
+
+      React.useEffect(() => {
+        localStorage.setItem('theme', theme);
+        document.body.style.background = theme === 'dark' ? '#020617' : '#f1f5f9';
+        document.body.style.color = theme === 'dark' ? 'white' : '#0f172a';
+      }, [theme]);
+
+      React.useEffect(() => {
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          setInstallPrompt(e);
+        });
+      }, []);
+
+      const income = transactions.filter(t => t.type === 'income').reduce((a,b)=>a+b.amount,0);
+      const expense = transactions.filter(t => t.type === 'expense').reduce((a,b)=>a+b.amount,0);
+      const balance = income - expense;
+
+      const monthlyData = [];
+      const monthMap = {};
+
+      transactions.forEach(t => {
+        const month = t.date.slice(0,7);
+        if(!monthMap[month]) monthMap[month] = {month,income:0,expense:0};
+        monthMap[month][t.type] += t.amount;
+      });
+
+      Object.values(monthMap).forEach(v => monthlyData.push(v));
+
+      const expenseCategory = {};
+      transactions.filter(t=>t.type==='expense').forEach(t=>{
+        expenseCategory[t.category] = (expenseCategory[t.category] || 0) + t.amount;
+      });
+
+      const pieData = Object.keys(expenseCategory).map(k => ({
+        name:k,
+        value:expenseCategory[k]
+      }));
+
+      const filtered = transactions.filter(t => {
+        return JSON.stringify(t).toLowerCase().includes(search.toLowerCase());
+      }).sort((a,b)=> new Date(b.date)-new Date(a.date));
+
+      const saveTransaction = () => {
+        if(!amount) return;
+
+        const tx = {
+          id: crypto.randomUUID(),
+          type,
+          category,
+          amount:Number(amount),
+          note,
+          date,
+          wallet
+        };
+
+        setTransactions([tx,...transactions]);
+        setAmount('');
+        setNote('');
+      };
+
+      const deleteTx = (id) => {
+        setTransactions(transactions.filter(t=>t.id !== id));
+      };
+
+      const exportData = () => {
+        const blob = new Blob([JSON.stringify(transactions,null,2)], {type:'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'backup-budget.json';
+        a.click();
+      };
+
+      const importData = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            setTransactions(data);
+          } catch(err) {
+            alert('File tidak valid');
+          }
+        };
+        reader.readAsText(file);
+      };
+
+      const savingProgress = Math.min(100, (Math.max(balance,0)/savingTarget)*100);
+
+      const aiAdvice = expense > income
+        ? 'Pengeluaran lebih besar dari pemasukan. Kurangi biaya hiburan dan belanja.'
+        : 'Keuangan sehat. Pertimbangkan investasi atau menabung tambahan.';
+
+      return (
+        <div className="max-w-md mx-auto min-h-screen p-4 animate-fade">
+
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h1 className="text-2xl font-bold">Budget PWA</h1>
+              <p className="text-sm opacity-70">Manajemen keuangan modern</p>
+            </div>
+
+            <button
+              onClick={()=>setTheme(theme==='dark'?'light':'dark')}
+              className="glass px-4 py-2 rounded-2xl"
+            >
+              {theme==='dark' ? '☀️' : '🌙'}
+            </button>
+          </div>
+
+          {installPrompt && (
+            <button
+              className="w-full mb-4 bg-blue-600 py-3 rounded-2xl font-bold"
+              onClick={()=>installPrompt.prompt()}
+            >
+              Install Aplikasi
+            </button>
+          )}
+
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <Card title="Saldo" value={currency.format(balance)} />
+            <Card title="Masuk" value={currency.format(income)} />
+            <Card title="Keluar" value={currency.format(expense)} />
+          </div>
+
+          <div className="glass rounded-3xl p-4 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="font-bold">Target Tabungan</h2>
+              <span>{savingProgress.toFixed(0)}%</span>
+            </div>
+
+            <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
+              <div
+                className="bg-emerald-400 h-full"
+                style={{width:`${savingProgress}%`}}
+              />
+            </div>
+
+            <input
+              type="number"
+              value={savingTarget}
+              onChange={e=>setSavingTarget(Number(e.target.value))}
+              className="w-full mt-3 p-3 rounded-2xl bg-slate-800 text-white"
+            />
+          </div>
+
+          <div className="glass rounded-3xl p-4 mb-4">
+            <h2 className="font-bold mb-3">Tambah Transaksi</h2>
+
+            <div className="flex gap-2 mb-3">
+              <button
+                className={`flex-1 p-3 rounded-2xl ${type==='expense'?'bg-red-500':'bg-slate-700'}`}
+                onClick={()=>{
+                  setType('expense');
+                  setCategory('Makanan');
+                }}
+              >
+                Pengeluaran
+              </button>
+
+              <button
+                className={`flex-1 p-3 rounded-2xl ${type==='income'?'bg-emerald-500':'bg-slate-700'}`}
+                onClick={()=>{
+                  setType('income');
+                  setCategory('Gaji');
+                }}
+              >
+                Pemasukan
+              </button>
+            </div>
+
+            <select
+              value={wallet}
+              onChange={e=>setWallet(e.target.value)}
+              className="w-full p-3 rounded-2xl bg-slate-800 mb-3"
+            >
+              {wallets.map(w=><option key={w}>{w}</option>)}
+            </select>
+
+            <select
+              value={category}
+              onChange={e=>setCategory(e.target.value)}
+              className="w-full p-3 rounded-2xl bg-slate-800 mb-3"
+            >
+              {(type==='income'?categories.income:categories.expense).map(c=><option key={c}>{c}</option>)}
+            </select>
+
+            <input
+              type="number"
+              placeholder="Nominal"
+              value={amount}
+              onChange={e=>setAmount(e.target.value)}
+              className="w-full p-3 rounded-2xl bg-slate-800 mb-3"
+            />
+
+            <input
+              type="text"
+              placeholder="Catatan"
+              value={note}
+              onChange={e=>setNote(e.target.value)}
+              className="w-full p-3 rounded-2xl bg-slate-800 mb-3"
+            />
+
+            <input
+              type="date"
+              value={date}
+              onChange={e=>setDate(e.target.value)}
+              className="w-full p-3 rounded-2xl bg-slate-800 mb-3"
+            />
+
+            <button
+              onClick={saveTransaction}
+              className="w-full bg-blue-600 p-3 rounded-2xl font-bold"
+            >
+              Simpan Transaksi
+            </button>
+          </div>
+
+          <div className="glass rounded-3xl p-4 mb-4">
+            <h2 className="font-bold mb-3">Dashboard Grafik</h2>
+
+            <div style={{width:'100%', height:250}}>
+              <ResponsiveContainer>
+                <BarChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip formatter={(v)=>currency.format(v)} />
+                  <Legend />
+                  <Bar dataKey="income" fill="#10b981" />
+                  <Bar dataKey="expense" fill="#ef4444" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div style={{width:'100%', height:250}}>
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    outerRadius={80}
+                    label
+                  >
+                    {pieData.map((entry,index)=><Cell key={index} fill={[ '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4'][index%6]} />)}
+                  </Pie>
+                  <Tooltip formatter={(v)=>currency.format(v)} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div style={{width:'100%', height:250}}>
+              <ResponsiveContainer>
+                <LineChart data={monthlyData}>
+                  <Line type="monotone" dataKey="income" stroke="#10b981" />
+                  <Line type="monotone" dataKey="expense" stroke="#ef4444" />
+                  <CartesianGrid stroke="#334155" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip formatter={(v)=>currency.format(v)} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="glass rounded-3xl p-4 mb-4">
+            <h2 className="font-bold mb-3">AI Analisis Keuangan</h2>
+            <p className="opacity-80">{aiAdvice}</p>
+          </div>
+
+          <div className="glass rounded-3xl p-4 mb-4">
+            <h2 className="font-bold mb-3">Pengingat Tagihan</h2>
+
+            <input
+              type="text"
+              placeholder="Contoh: Bayar listrik tanggal 10"
+              value={billReminder}
+              onChange={e=>setBillReminder(e.target.value)}
+              className="w-full p-3 rounded-2xl bg-slate-800"
+            />
+
+            {billReminder && (
+              <div className="mt-3 bg-yellow-500/20 p-3 rounded-2xl">
+                🔔 {billReminder}
+              </div>
+            )}
+          </div>
+
+          <div className="glass rounded-3xl p-4 mb-4">
+            <h2 className="font-bold mb-3">Multi Dompet</h2>
+
+            <button
+              onClick={()=>{
+                const name = prompt('Nama dompet');
+                if(name) setWallets([...wallets,name]);
+              }}
+              className="w-full bg-purple-600 p-3 rounded-2xl font-bold"
+            >
+              Tambah Dompet
+            </button>
+          </div>
+
+          <div
