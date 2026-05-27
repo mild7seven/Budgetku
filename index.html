@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
   <title>Budget PWA</title>
 
-  <link rel="manifest" href="manifest.json" />
+  <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#0f172a" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -423,4 +423,83 @@
             </button>
           </div>
 
-          <div
+          <div className="glass rounded-3xl p-4 mb-4">
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={exportData}
+                className="flex-1 bg-emerald-600 p-3 rounded-2xl font-bold"
+              >
+                Backup
+              </button>
+
+              <label className="flex-1 bg-orange-500 p-3 rounded-2xl font-bold text-center">
+                Restore
+                <input type="file" hidden onChange={importData} />
+              </label>
+            </div>
+          </div>
+
+          <div className="glass rounded-3xl p-4 mb-20">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="font-bold">Riwayat</h2>
+              <input
+                type="text"
+                placeholder="Cari"
+                value={search}
+                onChange={e=>setSearch(e.target.value)}
+                className="bg-slate-800 p-2 rounded-xl"
+              />
+            </div>
+
+            {filtered.length === 0 && (
+              <p className="opacity-60 text-center py-6">Belum ada transaksi</p>
+            )}
+
+            {filtered.map(tx => (
+              <div key={tx.id} className="bg-slate-900 rounded-2xl p-4 mb-3">
+                <div className="flex justify-between items-start gap-3">
+                  <div>
+                    <div className="font-bold">{tx.note || tx.category}</div>
+                    <div className="text-sm opacity-70">{tx.category} • {tx.wallet}</div>
+                    <div className="text-xs opacity-50">{tx.date}</div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className={tx.type==='income'?'text-emerald-400':'text-red-400'}>
+                      {tx.type==='income'?'+':'-'}{currency.format(tx.amount)}
+                    </div>
+
+                    <button
+                      onClick={()=>deleteTx(tx.id)}
+                      className="text-xs mt-2 bg-red-500 px-3 py-1 rounded-xl"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function Card({title,value}) {
+      return (
+        <div className="glass rounded-3xl p-3 text-center">
+          <div className="text-xs opacity-70">{title}</div>
+          <div className="font-bold text-sm mt-1 break-words">{value}</div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js');
+      });
+    }
+  </script>
+</body>
+</html>
