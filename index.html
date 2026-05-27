@@ -55,19 +55,9 @@
 
   <script type="text/babel">
     const {
-      PieChart,
-      Pie,
-      Cell,
-      Tooltip,
-      ResponsiveContainer,
-      BarChart,
-      Bar,
-      XAxis,
-      YAxis,
-      CartesianGrid,
-      LineChart,
-      Line,
-      Legend
+      PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+      BarChart, Bar, XAxis, YAxis, CartesianGrid,
+      LineChart, Line, Legend
     } = Recharts;
 
     const STORAGE_KEY = 'budget-pwa';
@@ -216,26 +206,18 @@
 
       return (
         <div className="max-w-md mx-auto min-h-screen p-4 animate-fade">
-
           <div className="flex justify-between items-center mb-4">
             <div>
               <h1 className="text-2xl font-bold">Budget PWA</h1>
               <p className="text-sm opacity-70">Manajemen keuangan modern</p>
             </div>
-
-            <button
-              onClick={()=>setTheme(theme==='dark'?'light':'dark')}
-              className="glass px-4 py-2 rounded-2xl"
-            >
+            <button onClick={()=>setTheme(theme==='dark'?'light':'dark')} className="glass px-4 py-2 rounded-2xl">
               {theme==='dark' ? '☀️' : '🌙'}
             </button>
           </div>
 
           {installPrompt && (
-            <button
-              className="w-full mb-4 bg-blue-600 py-3 rounded-2xl font-bold"
-              onClick={()=>installPrompt.prompt()}
-            >
+            <button className="w-full mb-4 bg-blue-600 py-3 rounded-2xl font-bold" onClick={()=>installPrompt.prompt()}>
               Install Aplikasi
             </button>
           )}
@@ -251,97 +233,32 @@
               <h2 className="font-bold">Target Tabungan</h2>
               <span>{savingProgress.toFixed(0)}%</span>
             </div>
-
             <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
-              <div
-                className="bg-emerald-400 h-full"
-                style={{width:`${savingProgress}%`}}
-              />
+              <div className="bg-emerald-400 h-full" style={{width:`${savingProgress}%`}} />
             </div>
-
-            <input
-              type="number"
-              value={savingTarget}
-              onChange={e=>setSavingTarget(Number(e.target.value))}
-              className="w-full mt-3 p-3 rounded-2xl bg-slate-800 text-white"
-            />
+            <input type="number" value={savingTarget} onChange={e=>setSavingTarget(Number(e.target.value))} className="w-full mt-3 p-3 rounded-2xl bg-slate-800 text-white" />
           </div>
 
           <div className="glass rounded-3xl p-4 mb-4">
             <h2 className="font-bold mb-3">Tambah Transaksi</h2>
-
             <div className="flex gap-2 mb-3">
-              <button
-                className={`flex-1 p-3 rounded-2xl ${type==='expense'?'bg-red-500':'bg-slate-700'}`}
-                onClick={()=>{
-                  setType('expense');
-                  setCategory('Makanan');
-                }}
-              >
-                Pengeluaran
-              </button>
-
-              <button
-                className={`flex-1 p-3 rounded-2xl ${type==='income'?'bg-emerald-500':'bg-slate-700'}`}
-                onClick={()=>{
-                  setType('income');
-                  setCategory('Gaji');
-                }}
-              >
-                Pemasukan
-              </button>
+              <button className={`flex-1 p-3 rounded-2xl ${type==='expense'?'bg-red-500':'bg-slate-700'}`} onClick={()=>{setType('expense'); setCategory('Makanan');}}>Pengeluaran</button>
+              <button className={`flex-1 p-3 rounded-2xl ${type==='income'?'bg-emerald-500':'bg-slate-700'}`} onClick={()=>{setType('income'); setCategory('Gaji');}}>Pemasukan</button>
             </div>
-
-            <select
-              value={wallet}
-              onChange={e=>setWallet(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-slate-800 mb-3"
-            >
+            <select value={wallet} onChange={e=>setWallet(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800 mb-3">
               {wallets.map(w=><option key={w}>{w}</option>)}
             </select>
-
-            <select
-              value={category}
-              onChange={e=>setCategory(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-slate-800 mb-3"
-            >
+            <select value={category} onChange={e=>setCategory(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800 mb-3">
               {(type==='income'?categories.income:categories.expense).map(c=><option key={c}>{c}</option>)}
             </select>
-
-            <input
-              type="number"
-              placeholder="Nominal"
-              value={amount}
-              onChange={e=>setAmount(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-slate-800 mb-3"
-            />
-
-            <input
-              type="text"
-              placeholder="Catatan"
-              value={note}
-              onChange={e=>setNote(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-slate-800 mb-3"
-            />
-
-            <input
-              type="date"
-              value={date}
-              onChange={e=>setDate(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-slate-800 mb-3"
-            />
-
-            <button
-              onClick={saveTransaction}
-              className="w-full bg-blue-600 p-3 rounded-2xl font-bold"
-            >
-              Simpan Transaksi
-            </button>
+            <input type="number" placeholder="Nominal" value={amount} onChange={e=>setAmount(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800 mb-3" />
+            <input type="text" placeholder="Catatan" value={note} onChange={e=>setNote(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800 mb-3" />
+            <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800 mb-3" />
+            <button onClick={saveTransaction} className="w-full bg-blue-600 p-3 rounded-2xl font-bold">Simpan Transaksi</button>
           </div>
 
           <div className="glass rounded-3xl p-4 mb-4">
             <h2 className="font-bold mb-3">Dashboard Grafik</h2>
-
             <div style={{width:'100%', height:250}}>
               <ResponsiveContainer>
                 <BarChart data={monthlyData}>
@@ -355,24 +272,17 @@
                 </BarChart>
               </ResponsiveContainer>
             </div>
-
-            <div style={{width:'100%', height:250}}>
+            <div style={{width:'100%', height:250}} className="mt-4">
               <ResponsiveContainer>
                 <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    outerRadius={80}
-                    label
-                  >
+                  <Pie data={pieData} dataKey="value" outerRadius={80} label>
                     {pieData.map((entry,index)=><Cell key={index} fill={[ '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4'][index%6]} />)}
                   </Pie>
                   <Tooltip formatter={(v)=>currency.format(v)} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-
-            <div style={{width:'100%', height:250}}>
+            <div style={{width:'100%', height:250}} className="mt-4">
               <ResponsiveContainer>
                 <LineChart data={monthlyData}>
                   <Line type="monotone" dataKey="income" stroke="#10b981" />
@@ -393,46 +303,19 @@
 
           <div className="glass rounded-3xl p-4 mb-4">
             <h2 className="font-bold mb-3">Pengingat Tagihan</h2>
-
-            <input
-              type="text"
-              placeholder="Contoh: Bayar listrik tanggal 10"
-              value={billReminder}
-              onChange={e=>setBillReminder(e.target.value)}
-              className="w-full p-3 rounded-2xl bg-slate-800"
-            />
-
-            {billReminder && (
-              <div className="mt-3 bg-yellow-500/20 p-3 rounded-2xl">
-                🔔 {billReminder}
-              </div>
-            )}
+            <input type="text" placeholder="Contoh: Bayar listrik tanggal 10" value={billReminder} onChange={e=>setBillReminder(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800" />
+            {billReminder && <div className="mt-3 bg-yellow-500/20 p-3 rounded-2xl">🔔 {billReminder}</div>}
           </div>
 
           <div className="glass rounded-3xl p-4 mb-4">
             <h2 className="font-bold mb-3">Multi Dompet</h2>
-
-            <button
-              onClick={()=>{
-                const name = prompt('Nama dompet');
-                if(name) setWallets([...wallets,name]);
-              }}
-              className="w-full bg-purple-600 p-3 rounded-2xl font-bold"
-            >
-              Tambah Dompet
-            </button>
+            <button onClick={()=>{const name = prompt('Nama dompet'); if(name) setWallets([...wallets,name]);}} className="w-full bg-purple-600 p-3 rounded-2xl font-bold">Tambah Dompet</button>
           </div>
 
           <div className="glass rounded-3xl p-4 mb-4">
             <div className="flex gap-2 mb-3">
-              <button
-                onClick={exportData}
-                className="flex-1 bg-emerald-600 p-3 rounded-2xl font-bold"
-              >
-                Backup
-              </button>
-
-              <label className="flex-1 bg-orange-500 p-3 rounded-2xl font-bold text-center">
+              <button onClick={exportData} className="flex-1 bg-emerald-600 p-3 rounded-2xl font-bold">Backup</button>
+              <label className="flex-1 bg-orange-500 p-3 rounded-2xl font-bold text-center cursor-pointer">
                 Restore
                 <input type="file" hidden onChange={importData} />
               </label>
@@ -442,18 +325,10 @@
           <div className="glass rounded-3xl p-4 mb-20">
             <div className="flex justify-between items-center mb-3">
               <h2 className="font-bold">Riwayat</h2>
-              <input
-                type="text"
-                placeholder="Cari"
-                value={search}
-                onChange={e=>setSearch(e.target.value)}
-                className="bg-slate-800 p-2 rounded-xl"
-              />
+              <input type="text" placeholder="Cari" value={search} onChange={e=>setSearch(e.target.value)} className="bg-slate-800 p-2 rounded-xl w-1/2" />
             </div>
 
-            {filtered.length === 0 && (
-              <p className="opacity-60 text-center py-6">Belum ada transaksi</p>
-            )}
+            {filtered.length === 0 && <p className="opacity-60 text-center py-6">Belum ada transaksi</p>}
 
             {filtered.map(tx => (
               <div key={tx.id} className="bg-slate-900 rounded-2xl p-4 mb-3">
@@ -463,18 +338,11 @@
                     <div className="text-sm opacity-70">{tx.category} • {tx.wallet}</div>
                     <div className="text-xs opacity-50">{tx.date}</div>
                   </div>
-
                   <div className="text-right">
                     <div className={tx.type==='income'?'text-emerald-400':'text-red-400'}>
                       {tx.type==='income'?'+':'-'}{currency.format(tx.amount)}
                     </div>
-
-                    <button
-                      onClick={()=>deleteTx(tx.id)}
-                      className="text-xs mt-2 bg-red-500 px-3 py-1 rounded-xl"
-                    >
-                      Hapus
-                    </button>
+                    <button onClick={()=>deleteTx(tx.id)} className="text-xs mt-2 bg-red-500 px-3 py-1 rounded-xl">Hapus</button>
                   </div>
                 </div>
               </div>
@@ -493,11 +361,14 @@
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js');
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+          console.error("Service Worker failed to register:", err);
+        });
       });
     }
   </script>
