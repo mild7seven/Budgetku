@@ -1,5 +1,7 @@
+// Mengubah versi cache memastikan GitHub Pages menghidangkan file yang telah diperbarui
 const CACHE_NAME = "budget-pwa-v4";
 
+// Memastikan fallback relative URL untuk aset statis 
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -22,6 +24,7 @@ self.addEventListener("activate", (event) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
+            // Menghapus cache versi lama secara otomatis
             return caches.delete(key);
           }
         })
@@ -34,6 +37,9 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  // Melewati cache untuk ekstensi chrome/browser internal
+  if (event.request.url.startsWith('chrome-extension://')) return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
@@ -60,14 +66,9 @@ self.addEventListener("fetch", (event) => {
           return networkResponse;
         })
         .catch(() => {
+          // Fallback offline ke index.html
           return caches.match("./index.html");
         });
     })
   );
-});
-
-self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
-    self.skipWaiting();
-  }
 });
