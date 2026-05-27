@@ -1,376 +1,486 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="light">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-  <title>Budget PWA</title>
-
-  <link rel="manifest" href="./manifest.json" />
-  <meta name="theme-color" content="#0f172a" />
-  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
-  <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <style>
-    body {
-      margin: 0;
-      font-family: Inter, sans-serif;
-      background: #020617;
-      color: white;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    * {
-      box-sizing: border-box;
-      scrollbar-width: none;
-    }
-
-    *::-webkit-scrollbar {
-      display: none;
-    }
-
-    .glass {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.08);
-      backdrop-filter: blur(12px);
-    }
-
-    .animate-fade {
-      animation: fade .3s ease;
-    }
-
-    @keyframes fade {
-      from {opacity:0; transform:translateY(8px)}
-      to {opacity:1; transform:translateY(0)}
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catat Anggaran</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { primary: '#3b82f6' } } }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .view-section { display: none; }
+        .view-section.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
 </head>
-<body>
-  <div id="root"></div>
+<body class="bg-gray-100 dark:bg-gray-900 dark:text-white transition-colors duration-200 pb-20 md:pb-0">
 
-  <script type="text/babel">
-    const {
-      PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-      BarChart, Bar, XAxis, YAxis, CartesianGrid,
-      LineChart, Line, Legend
-    } = Recharts;
+    <header class="bg-primary text-white p-4 shadow-md flex justify-between items-center fixed top-0 w-full z-10">
+        <h1 class="text-xl font-bold"><i class="fas fa-wallet mr-2"></i>Catat Anggaran</h1>
+        <button id="themeToggle" class="p-2 rounded-full hover:bg-blue-600 focus:outline-none">
+            <i class="fas fa-moon" id="themeIcon"></i>
+        </button>
+    </header>
 
-    const STORAGE_KEY = 'budget-pwa';
-
-    const currency = new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0,
-    });
-
-    const categories = {
-      income: ['Gaji','Freelance','Bonus','Investasi','Lainnya'],
-      expense: ['Makanan','Transportasi','Belanja','Tagihan','Kesehatan','Hiburan','Pendidikan','Lainnya']
-    };
-
-    function App() {
-      const [transactions, setTransactions] = React.useState(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        return saved ? JSON.parse(saved) : [];
-      });
-
-      const [type, setType] = React.useState('expense');
-      const [category, setCategory] = React.useState('Makanan');
-      const [amount, setAmount] = React.useState('');
-      const [note, setNote] = React.useState('');
-      const [date, setDate] = React.useState(new Date().toISOString().slice(0,10));
-      const [budget, setBudget] = React.useState(Number(localStorage.getItem('budgetLimit')) || 10000000);
-      const [wallets, setWallets] = React.useState(JSON.parse(localStorage.getItem('wallets')) || ['Dompet Utama']);
-      const [wallet, setWallet] = React.useState('Dompet Utama');
-      const [savingTarget, setSavingTarget] = React.useState(Number(localStorage.getItem('savingTarget')) || 5000000);
-      const [billReminder, setBillReminder] = React.useState('');
-      const [search, setSearch] = React.useState('');
-      const [theme, setTheme] = React.useState(localStorage.getItem('theme') || 'dark');
-      const [installPrompt, setInstallPrompt] = React.useState(null);
-
-      React.useEffect(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
-      }, [transactions]);
-
-      React.useEffect(() => {
-        localStorage.setItem('budgetLimit', budget);
-      }, [budget]);
-
-      React.useEffect(() => {
-        localStorage.setItem('wallets', JSON.stringify(wallets));
-      }, [wallets]);
-
-      React.useEffect(() => {
-        localStorage.setItem('savingTarget', savingTarget);
-      }, [savingTarget]);
-
-      React.useEffect(() => {
-        localStorage.setItem('theme', theme);
-        document.body.style.background = theme === 'dark' ? '#020617' : '#f1f5f9';
-        document.body.style.color = theme === 'dark' ? 'white' : '#0f172a';
-      }, [theme]);
-
-      React.useEffect(() => {
-        window.addEventListener('beforeinstallprompt', (e) => {
-          e.preventDefault();
-          setInstallPrompt(e);
-        });
-      }, []);
-
-      const income = transactions.filter(t => t.type === 'income').reduce((a,b)=>a+b.amount,0);
-      const expense = transactions.filter(t => t.type === 'expense').reduce((a,b)=>a+b.amount,0);
-      const balance = income - expense;
-
-      const monthlyData = [];
-      const monthMap = {};
-
-      transactions.forEach(t => {
-        const month = t.date.slice(0,7);
-        if(!monthMap[month]) monthMap[month] = {month,income:0,expense:0};
-        monthMap[month][t.type] += t.amount;
-      });
-
-      Object.values(monthMap).forEach(v => monthlyData.push(v));
-
-      const expenseCategory = {};
-      transactions.filter(t=>t.type==='expense').forEach(t=>{
-        expenseCategory[t.category] = (expenseCategory[t.category] || 0) + t.amount;
-      });
-
-      const pieData = Object.keys(expenseCategory).map(k => ({
-        name:k,
-        value:expenseCategory[k]
-      }));
-
-      const filtered = transactions.filter(t => {
-        return JSON.stringify(t).toLowerCase().includes(search.toLowerCase());
-      }).sort((a,b)=> new Date(b.date)-new Date(a.date));
-
-      const saveTransaction = () => {
-        if(!amount) return;
-
-        const tx = {
-          id: crypto.randomUUID(),
-          type,
-          category,
-          amount:Number(amount),
-          note,
-          date,
-          wallet
-        };
-
-        setTransactions([tx,...transactions]);
-        setAmount('');
-        setNote('');
-      };
-
-      const deleteTx = (id) => {
-        setTransactions(transactions.filter(t=>t.id !== id));
-      };
-
-      const exportData = () => {
-        const blob = new Blob([JSON.stringify(transactions,null,2)], {type:'application/json'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'backup-budget.json';
-        a.click();
-      };
-
-      const importData = (e) => {
-        const file = e.target.files[0];
-        if(!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          try {
-            const data = JSON.parse(ev.target.result);
-            setTransactions(data);
-          } catch(err) {
-            alert('File tidak valid');
-          }
-        };
-        reader.readAsText(file);
-      };
-
-      const savingProgress = Math.min(100, (Math.max(balance,0)/savingTarget)*100);
-
-      const aiAdvice = expense > income
-        ? 'Pengeluaran lebih besar dari pemasukan. Kurangi biaya hiburan dan belanja.'
-        : 'Keuangan sehat. Pertimbangkan investasi atau menabung tambahan.';
-
-      return (
-        <div className="max-w-md mx-auto min-h-screen p-4 animate-fade">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h1 className="text-2xl font-bold">Budget PWA</h1>
-              <p className="text-sm opacity-70">Manajemen keuangan modern</p>
-            </div>
-            <button onClick={()=>setTheme(theme==='dark'?'light':'dark')} className="glass px-4 py-2 rounded-2xl">
-              {theme==='dark' ? '☀️' : '🌙'}
-            </button>
-          </div>
-
-          {installPrompt && (
-            <button className="w-full mb-4 bg-blue-600 py-3 rounded-2xl font-bold" onClick={()=>installPrompt.prompt()}>
-              Install Aplikasi
-            </button>
-          )}
-
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <Card title="Saldo" value={currency.format(balance)} />
-            <Card title="Masuk" value={currency.format(income)} />
-            <Card title="Keluar" value={currency.format(expense)} />
-          </div>
-
-          <div className="glass rounded-3xl p-4 mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="font-bold">Target Tabungan</h2>
-              <span>{savingProgress.toFixed(0)}%</span>
-            </div>
-            <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
-              <div className="bg-emerald-400 h-full" style={{width:`${savingProgress}%`}} />
-            </div>
-            <input type="number" value={savingTarget} onChange={e=>setSavingTarget(Number(e.target.value))} className="w-full mt-3 p-3 rounded-2xl bg-slate-800 text-white" />
-          </div>
-
-          <div className="glass rounded-3xl p-4 mb-4">
-            <h2 className="font-bold mb-3">Tambah Transaksi</h2>
-            <div className="flex gap-2 mb-3">
-              <button className={`flex-1 p-3 rounded-2xl ${type==='expense'?'bg-red-500':'bg-slate-700'}`} onClick={()=>{setType('expense'); setCategory('Makanan');}}>Pengeluaran</button>
-              <button className={`flex-1 p-3 rounded-2xl ${type==='income'?'bg-emerald-500':'bg-slate-700'}`} onClick={()=>{setType('income'); setCategory('Gaji');}}>Pemasukan</button>
-            </div>
-            <select value={wallet} onChange={e=>setWallet(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800 mb-3">
-              {wallets.map(w=><option key={w}>{w}</option>)}
-            </select>
-            <select value={category} onChange={e=>setCategory(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800 mb-3">
-              {(type==='income'?categories.income:categories.expense).map(c=><option key={c}>{c}</option>)}
-            </select>
-            <input type="number" placeholder="Nominal" value={amount} onChange={e=>setAmount(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800 mb-3" />
-            <input type="text" placeholder="Catatan" value={note} onChange={e=>setNote(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800 mb-3" />
-            <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800 mb-3" />
-            <button onClick={saveTransaction} className="w-full bg-blue-600 p-3 rounded-2xl font-bold">Simpan Transaksi</button>
-          </div>
-
-          <div className="glass rounded-3xl p-4 mb-4">
-            <h2 className="font-bold mb-3">Dashboard Grafik</h2>
-            <div style={{width:'100%', height:250}}>
-              <ResponsiveContainer>
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(v)=>currency.format(v)} />
-                  <Legend />
-                  <Bar dataKey="income" fill="#10b981" />
-                  <Bar dataKey="expense" fill="#ef4444" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div style={{width:'100%', height:250}} className="mt-4">
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie data={pieData} dataKey="value" outerRadius={80} label>
-                    {pieData.map((entry,index)=><Cell key={index} fill={[ '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4'][index%6]} />)}
-                  </Pie>
-                  <Tooltip formatter={(v)=>currency.format(v)} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div style={{width:'100%', height:250}} className="mt-4">
-              <ResponsiveContainer>
-                <LineChart data={monthlyData}>
-                  <Line type="monotone" dataKey="income" stroke="#10b981" />
-                  <Line type="monotone" dataKey="expense" stroke="#ef4444" />
-                  <CartesianGrid stroke="#334155" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(v)=>currency.format(v)} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="glass rounded-3xl p-4 mb-4">
-            <h2 className="font-bold mb-3">AI Analisis Keuangan</h2>
-            <p className="opacity-80">{aiAdvice}</p>
-          </div>
-
-          <div className="glass rounded-3xl p-4 mb-4">
-            <h2 className="font-bold mb-3">Pengingat Tagihan</h2>
-            <input type="text" placeholder="Contoh: Bayar listrik tanggal 10" value={billReminder} onChange={e=>setBillReminder(e.target.value)} className="w-full p-3 rounded-2xl bg-slate-800" />
-            {billReminder && <div className="mt-3 bg-yellow-500/20 p-3 rounded-2xl">🔔 {billReminder}</div>}
-          </div>
-
-          <div className="glass rounded-3xl p-4 mb-4">
-            <h2 className="font-bold mb-3">Multi Dompet</h2>
-            <button onClick={()=>{const name = prompt('Nama dompet'); if(name) setWallets([...wallets,name]);}} className="w-full bg-purple-600 p-3 rounded-2xl font-bold">Tambah Dompet</button>
-          </div>
-
-          <div className="glass rounded-3xl p-4 mb-4">
-            <div className="flex gap-2 mb-3">
-              <button onClick={exportData} className="flex-1 bg-emerald-600 p-3 rounded-2xl font-bold">Backup</button>
-              <label className="flex-1 bg-orange-500 p-3 rounded-2xl font-bold text-center cursor-pointer">
-                Restore
-                <input type="file" hidden onChange={importData} />
-              </label>
-            </div>
-          </div>
-
-          <div className="glass rounded-3xl p-4 mb-20">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="font-bold">Riwayat</h2>
-              <input type="text" placeholder="Cari" value={search} onChange={e=>setSearch(e.target.value)} className="bg-slate-800 p-2 rounded-xl w-1/2" />
-            </div>
-
-            {filtered.length === 0 && <p className="opacity-60 text-center py-6">Belum ada transaksi</p>}
-
-            {filtered.map(tx => (
-              <div key={tx.id} className="bg-slate-900 rounded-2xl p-4 mb-3">
-                <div className="flex justify-between items-start gap-3">
-                  <div>
-                    <div className="font-bold">{tx.note || tx.category}</div>
-                    <div className="text-sm opacity-70">{tx.category} • {tx.wallet}</div>
-                    <div className="text-xs opacity-50">{tx.date}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className={tx.type==='income'?'text-emerald-400':'text-red-400'}>
-                      {tx.type==='income'?'+':'-'}{currency.format(tx.amount)}
-                    </div>
-                    <button onClick={()=>deleteTx(tx.id)} className="text-xs mt-2 bg-red-500 px-3 py-1 rounded-xl">Hapus</button>
-                  </div>
+    <main class="pt-20 px-4 md:ml-64 md:pt-20 max-w-7xl mx-auto">
+        <section id="dashboard" class="view-section active">
+            <h2 class="text-2xl font-semibold mb-4">Dashboard</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Total Saldo</p>
+                    <h3 class="text-2xl font-bold" id="totalBalance">Rp 0</h3>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Pemasukan Bulan Ini</p>
+                    <h3 class="text-xl font-bold text-green-500" id="totalIncome">Rp 0</h3>
+                </div>
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">Pengeluaran Bulan Ini</p>
+                    <h3 class="text-xl font-bold text-red-500" id="totalExpense">Rp 0</h3>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <h3 class="font-semibold mb-2">Statistik Pengeluaran</h3>
+                    <canvas id="expenseChart"></canvas>
+                </div>
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <h3 class="font-semibold mb-2"><i class="fas fa-robot mr-2"></i>Analisis AI</h3>
+                    <div id="aiAnalysisResult" class="p-4 bg-blue-50 dark:bg-gray-700 rounded text-sm leading-relaxed border-l-4 border-primary">
+                        Memuat analisis pola pengeluaran Anda...
+                    </div>
+                </div>
+            </div>
 
-    function Card({title,value}) {
-      return (
-        <div className="glass rounded-3xl p-3 text-center">
-          <div className="text-xs opacity-70">{title}</div>
-          <div className="font-bold text-sm mt-1 break-words">{value}</div>
-        </div>
-      );
-    }
+            <div class="mt-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                <h3 class="font-semibold mb-2 text-yellow-600 dark:text-yellow-400"><i class="fas fa-bell mr-2"></i>Pengingat Tagihan Mendatang</h3>
+                <ul id="reminderList" class="divide-y dark:divide-gray-700"></ul>
+            </div>
+        </section>
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+        <section id="transactions" class="view-section">
+            <h2 class="text-2xl font-semibold mb-4">Transaksi</h2>
+            
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
+                <h3 class="font-semibold mb-4">Tambah Transaksi</h3>
+                <form id="txForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <select id="txType" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                        <option value="expense">Pengeluaran</option>
+                        <option value="income">Pemasukan</option>
+                    </select>
+                    <input type="number" id="txAmount" placeholder="Nominal (Rp)" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                    <select id="txWallet" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required></select>
+                    <select id="txCategory" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required></select>
+                    <input type="date" id="txDate" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                    <input type="text" id="txNote" placeholder="Catatan" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
+                    <button type="submit" class="bg-primary text-white p-2 rounded md:col-span-2 hover:bg-blue-600">Simpan Transaksi</button>
+                </form>
+            </div>
 
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(err => {
-          console.error("Service Worker failed to register:", err);
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-semibold">Riwayat Transaksi</h3>
+                    <input type="text" id="searchTx" placeholder="Cari catatan..." class="p-2 border rounded text-sm dark:bg-gray-700 dark:border-gray-600">
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead><tr class="border-b dark:border-gray-700"><th>Tgl</th><th>Kategori</th><th>Dompet</th><th>Catatan</th><th>Nominal</th></tr></thead>
+                        <tbody id="txHistory"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="wallets" class="view-section">
+            <h2 class="text-2xl font-semibold mb-4">Dompet & Target Tabungan</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <h3 class="font-semibold mb-4">Multi Wallet</h3>
+                    <ul id="walletList" class="mb-4 divide-y dark:divide-gray-700"></ul>
+                    <div class="flex gap-2">
+                        <input type="text" id="newWalletName" placeholder="Nama Dompet Baru" class="w-full p-2 border rounded text-sm dark:bg-gray-700 dark:border-gray-600">
+                        <button onclick="app.addWallet()" class="bg-green-500 text-white px-4 rounded hover:bg-green-600">Tambah</button>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                    <h3 class="font-semibold mb-4">Target Tabungan</h3>
+                    <ul id="targetList" class="mb-4 space-y-4"></ul>
+                    <div class="grid grid-cols-2 gap-2 mt-4">
+                        <input type="text" id="targetName" placeholder="Nama Target" class="p-2 border rounded text-sm dark:bg-gray-700 dark:border-gray-600">
+                        <input type="number" id="targetAmount" placeholder="Target Rp" class="p-2 border rounded text-sm dark:bg-gray-700 dark:border-gray-600">
+                        <button onclick="app.addTarget()" class="bg-primary text-white p-2 rounded col-span-2 hover:bg-blue-600">Tambah Target</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="settings" class="view-section">
+            <h2 class="text-2xl font-semibold mb-4">Pengaturan Sistem</h2>
+            
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
+                <h3 class="font-semibold mb-4">Label Kategori</h3>
+                <div class="flex gap-2 mb-4">
+                    <input type="text" id="newCategoryName" placeholder="Nama Kategori" class="w-full p-2 border rounded text-sm dark:bg-gray-700 dark:border-gray-600">
+                    <select id="newCategoryType" class="p-2 border rounded text-sm dark:bg-gray-700 dark:border-gray-600">
+                        <option value="expense">Pengeluaran</option>
+                        <option value="income">Pemasukan</option>
+                    </select>
+                    <button onclick="app.addCategory()" class="bg-primary text-white px-4 rounded hover:bg-blue-600">Tambah</button>
+                </div>
+                <ul id="categoryList" class="divide-y dark:divide-gray-700 max-h-40 overflow-y-auto"></ul>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <h3 class="font-semibold mb-2">Data Management (IndexedDB)</h3>
+                    <p class="text-sm text-gray-500 mb-4">Backup data Anda ke format JSON atau kembalikan data dari backup.</p>
+                    <div class="flex gap-2">
+                        <button onclick="app.exportData()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 w-full"><i class="fas fa-download mr-2"></i>Backup Data</button>
+                        <label class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 w-full text-center cursor-pointer">
+                            <i class="fas fa-upload mr-2"></i>Restore Data
+                            <input type="file" id="restoreFile" accept=".json" class="hidden" onchange="app.importData(event)">
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <nav class="bg-white dark:bg-gray-800 border-t dark:border-gray-700 md:border-t-0 md:border-r fixed bottom-0 md:top-16 md:left-0 w-full md:w-64 md:h-full z-10 flex md:flex-col justify-around md:justify-start">
+        <a href="#" onclick="app.switchTab('dashboard')" class="nav-link text-gray-500 dark:text-gray-400 p-4 md:p-6 text-center md:text-left flex flex-col md:flex-row items-center gap-2 hover:text-primary dark:hover:text-primary">
+            <i class="fas fa-home text-xl"></i> <span class="text-xs md:text-base">Beranda</span>
+        </a>
+        <a href="#" onclick="app.switchTab('transactions')" class="nav-link text-gray-500 dark:text-gray-400 p-4 md:p-6 text-center md:text-left flex flex-col md:flex-row items-center gap-2 hover:text-primary dark:hover:text-primary">
+            <i class="fas fa-exchange-alt text-xl"></i> <span class="text-xs md:text-base">Transaksi</span>
+        </a>
+        <a href="#" onclick="app.switchTab('wallets')" class="nav-link text-gray-500 dark:text-gray-400 p-4 md:p-6 text-center md:text-left flex flex-col md:flex-row items-center gap-2 hover:text-primary dark:hover:text-primary">
+            <i class="fas fa-piggy-bank text-xl"></i> <span class="text-xs md:text-base">Dompet</span>
+        </a>
+        <a href="#" onclick="app.switchTab('settings')" class="nav-link text-gray-500 dark:text-gray-400 p-4 md:p-6 text-center md:text-left flex flex-col md:flex-row items-center gap-2 hover:text-primary dark:hover:text-primary">
+            <i class="fas fa-cog text-xl"></i> <span class="text-xs md:text-base">Pengaturan</span>
+        </a>
+    </nav>
+
+    <script>
+        // Init Database
+        const db = new Dexie("AnggaranDB");
+        db.version(1).stores({
+            transactions: '++id, type, amount, category, walletId, date, note',
+            wallets: '++id, name, balance',
+            categories: '++id, type, name',
+            targets: '++id, name, targetAmount, currentAmount'
         });
-      });
-    }
-  </script>
+
+        let chartInstance = null;
+
+        const app = {
+            formatRupiah: (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka),
+            
+            init: async function() {
+                // Seed default data if empty
+                if(await db.wallets.count() === 0) await db.wallets.add({name: 'Tunai', balance: 0});
+                if(await db.categories.count() === 0) {
+                    await db.categories.bulkAdd([
+                        {type: 'income', name: 'Gaji'}, {type: 'expense', name: 'Makanan'}, {type: 'expense', name: 'Transportasi'}
+                    ]);
+                }
+                
+                document.getElementById('txDate').valueAsDate = new Date();
+                this.setupEventListeners();
+                this.loadData();
+                this.switchTab('dashboard');
+                
+                // Dark mode init
+                if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.classList.add('dark');
+                    document.getElementById('themeIcon').classList.replace('fa-moon', 'fa-sun');
+                }
+            },
+
+            setupEventListeners: function() {
+                document.getElementById('themeToggle').addEventListener('click', () => {
+                    document.documentElement.classList.toggle('dark');
+                    const isDark = document.documentElement.classList.contains('dark');
+                    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                    document.getElementById('themeIcon').className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+                    if(chartInstance) this.updateChart(); // Refresh chart colors
+                });
+
+                document.getElementById('txForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const type = document.getElementById('txType').value;
+                    const amount = parseFloat(document.getElementById('txAmount').value);
+                    const walletId = parseInt(document.getElementById('txWallet').value);
+                    const category = document.getElementById('txCategory').value;
+                    const date = document.getElementById('txDate').value;
+                    const note = document.getElementById('txNote').value;
+
+                    await db.transaction('rw', db.transactions, db.wallets, async () => {
+                        await db.transactions.add({ type, amount, category, walletId, date, note });
+                        const wallet = await db.wallets.get(walletId);
+                        wallet.balance += (type === 'income' ? amount : -amount);
+                        await db.wallets.put(wallet);
+                    });
+
+                    document.getElementById('txForm').reset();
+                    document.getElementById('txDate').valueAsDate = new Date();
+                    alert("Transaksi tersimpan!");
+                    this.loadData();
+                });
+
+                document.getElementById('searchTx').addEventListener('input', (e) => this.renderTransactions(e.target.value));
+            },
+
+            loadData: async function() {
+                this.updateSelectOptions();
+                this.renderDashboard();
+                this.renderTransactions();
+                this.renderWallets();
+                this.renderTargets();
+                this.renderCategories();
+            },
+
+            updateSelectOptions: async function() {
+                const wallets = await db.wallets.toArray();
+                const categories = await db.categories.toArray();
+                
+                const wSelect = document.getElementById('txWallet');
+                wSelect.innerHTML = wallets.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+                
+                const cSelect = document.getElementById('txCategory');
+                const updateCats = () => {
+                    const type = document.getElementById('txType').value;
+                    cSelect.innerHTML = categories.filter(c => c.type === type).map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+                };
+                document.getElementById('txType').addEventListener('change', updateCats);
+                updateCats();
+            },
+
+            renderDashboard: async function() {
+                const txs = await db.transactions.toArray();
+                const wallets = await db.wallets.toArray();
+                
+                const totalBal = wallets.reduce((sum, w) => sum + w.balance, 0);
+                
+                const currMonth = new Date().toISOString().slice(0,7);
+                let inc = 0, exp = 0;
+                
+                const expByCategory = {};
+
+                txs.forEach(t => {
+                    if(t.date.startsWith(currMonth)) {
+                        if(t.type === 'income') inc += t.amount;
+                        else {
+                            exp += t.amount;
+                            expByCategory[t.category] = (expByCategory[t.category] || 0) + t.amount;
+                        }
+                    }
+                });
+
+                document.getElementById('totalBalance').innerText = this.formatRupiah(totalBal);
+                document.getElementById('totalIncome').innerText = this.formatRupiah(inc);
+                document.getElementById('totalExpense').innerText = this.formatRupiah(exp);
+
+                this.updateChart(expByCategory);
+                this.generateAIAnalysis(expByCategory, exp, inc);
+            },
+
+            updateChart: function(dataMap = null) {
+                if(!dataMap && !chartInstance) return;
+                
+                const isDark = document.documentElement.classList.contains('dark');
+                const textColor = isDark ? '#fff' : '#333';
+
+                if(chartInstance && dataMap) chartInstance.destroy();
+                
+                if(dataMap) {
+                    const ctx = document.getElementById('expenseChart').getContext('2d');
+                    window.chartDataMap = dataMap; // Store for theme switching
+                    chartInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: Object.keys(dataMap),
+                            datasets: [{
+                                data: Object.values(dataMap),
+                                backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6']
+                            }]
+                        },
+                        options: { plugins: { legend: { labels: { color: textColor } } } }
+                    });
+                } else if (chartInstance && window.chartDataMap) {
+                     chartInstance.options.plugins.legend.labels.color = textColor;
+                     chartInstance.update();
+                }
+            },
+
+            generateAIAnalysis: function(expMap, totalExp, totalInc) {
+                const el = document.getElementById('aiAnalysisResult');
+                if (totalExp === 0 && totalInc === 0) {
+                    el.innerHTML = "Belum ada data transaksi bulan ini. Mulai catat keuangan Anda untuk mendapatkan analisis.";
+                    return;
+                }
+                
+                let highestCat = '';
+                let highestVal = 0;
+                for(let [cat, val] of Object.entries(expMap)) {
+                    if(val > highestVal) { highestVal = val; highestCat = cat; }
+                }
+
+                let text = `Bulan ini, Anda telah menghabiskan <b>${this.formatRupiah(totalExp)}</b>. `;
+                if(highestCat) {
+                    const pct = ((highestVal / totalExp) * 100).toFixed(1);
+                    text += `Pengeluaran terbesar Anda ada di kategori <b>${highestCat}</b> (${pct}% dari total). `;
+                }
+                
+                if(totalExp > totalInc && totalInc > 0) text += `<br><span class="text-red-500 font-semibold"><i class="fas fa-exclamation-triangle"></i> Peringatan: Pengeluaran bulan ini melebihi pemasukan. Pertimbangkan untuk mengurangi alokasi ${highestCat}.</span>`;
+                else text += `<br><span class="text-green-500 font-semibold"><i class="fas fa-check-circle"></i> Bagus! Keuangan Anda bulan ini terkendali.</span>`;
+                
+                el.innerHTML = text;
+            },
+
+            renderTransactions: async function(search = '') {
+                const txs = await db.transactions.orderBy('date').reverse().toArray();
+                const wallets = await db.wallets.toArray();
+                const walletMap = {}; wallets.forEach(w => walletMap[w.id] = w.name);
+
+                const filtered = txs.filter(t => t.note.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase()));
+
+                const html = filtered.map(t => `
+                    <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td class="p-2">${t.date}</td>
+                        <td class="p-2">${t.category}</td>
+                        <td class="p-2">${walletMap[t.walletId] || 'Hapus'}</td>
+                        <td class="p-2">${t.note}</td>
+                        <td class="p-2 font-bold ${t.type === 'income' ? 'text-green-500' : 'text-red-500'}">
+                            ${t.type === 'income' ? '+' : '-'}${this.formatRupiah(t.amount)}
+                        </td>
+                    </tr>
+                `).join('');
+                document.getElementById('txHistory').innerHTML = html || '<tr><td colspan="5" class="text-center p-4 text-gray-500">Tidak ada transaksi.</td></tr>';
+            },
+
+            renderWallets: async function() {
+                const wallets = await db.wallets.toArray();
+                document.getElementById('walletList').innerHTML = wallets.map(w => `
+                    <li class="py-2 flex justify-between items-center">
+                        <span><i class="fas fa-wallet text-gray-400 mr-2"></i> ${w.name}</span>
+                        <span class="font-bold">${this.formatRupiah(w.balance)}</span>
+                    </li>
+                `).join('');
+            },
+
+            addWallet: async function() {
+                const name = document.getElementById('newWalletName').value.trim();
+                if(!name) return;
+                await db.wallets.add({name, balance: 0});
+                document.getElementById('newWalletName').value = '';
+                this.loadData();
+            },
+
+            renderTargets: async function() {
+                const targets = await db.targets.toArray();
+                document.getElementById('targetList').innerHTML = targets.map(t => {
+                    const pct = Math.min(100, (t.currentAmount / t.targetAmount) * 100).toFixed(1);
+                    return `
+                    <li class="bg-gray-50 dark:bg-gray-700 p-3 rounded">
+                        <div class="flex justify-between mb-1"><span class="font-semibold">${t.name}</span> <span class="text-xs">${pct}%</span></div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-600">
+                          <div class="bg-primary h-2.5 rounded-full" style="width: ${pct}%"></div>
+                        </div>
+                        <div class="text-xs mt-1 text-gray-500 dark:text-gray-300">${this.formatRupiah(t.currentAmount)} / ${this.formatRupiah(t.targetAmount)}</div>
+                    </li>`;
+                }).join('');
+            },
+
+            addTarget: async function() {
+                const name = document.getElementById('targetName').value;
+                const targetAmount = parseFloat(document.getElementById('targetAmount').value);
+                if(name && targetAmount) {
+                    await db.targets.add({name, targetAmount, currentAmount: 0});
+                    this.loadData();
+                }
+            },
+
+            renderCategories: async function() {
+                const cats = await db.categories.toArray();
+                document.getElementById('categoryList').innerHTML = cats.map(c => `
+                    <li class="py-2 flex justify-between"><span>${c.name}</span> <span class="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded">${c.type === 'income' ? 'Pemasukan' : 'Pengeluaran'}</span></li>
+                `).join('');
+            },
+
+            addCategory: async function() {
+                const name = document.getElementById('newCategoryName').value;
+                const type = document.getElementById('newCategoryType').value;
+                if(name) {
+                    await db.categories.add({name, type});
+                    document.getElementById('newCategoryName').value = '';
+                    this.loadData();
+                }
+            },
+
+            exportData: async function() {
+                const data = {
+                    transactions: await db.transactions.toArray(),
+                    wallets: await db.wallets.toArray(),
+                    categories: await db.categories.toArray(),
+                    targets: await db.targets.toArray()
+                };
+                const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'backup_anggaran.json'; a.click();
+            },
+
+            importData: function(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        await db.transaction('rw', db.transactions, db.wallets, db.categories, db.targets, async () => {
+                            await db.transactions.clear(); await db.transactions.bulkAdd(data.transactions || []);
+                            await db.wallets.clear(); await db.wallets.bulkAdd(data.wallets || []);
+                            await db.categories.clear(); await db.categories.bulkAdd(data.categories || []);
+                            await db.targets.clear(); await db.targets.bulkAdd(data.targets || []);
+                        });
+                        alert('Data berhasil direstore!');
+                        this.loadData();
+                    } catch (err) { alert('Gagal membaca file backup.'); }
+                };
+                reader.readAsText(file);
+            },
+
+            switchTab: function(tabId) {
+                document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+                document.getElementById(tabId).classList.add('active');
+                
+                document.querySelectorAll('.nav-link').forEach(el => {
+                    el.classList.remove('text-primary');
+                    if(el.getAttribute('onclick').includes(tabId)) el.classList.add('text-primary');
+                });
+            }
+        };
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => app.init());
+
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Reg failed: ', err));
+            });
+        }
+    </script>
 </body>
 </html>
